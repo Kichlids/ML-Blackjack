@@ -4,26 +4,44 @@ using UnityEngine;
 
 public class QLearning : MonoBehaviour {
 
+    public static QLearning ql;
+
     public int wins = 0;
 
+    [Header("Q Learning params")]
+    // Learning rate
     public float learningRate = 0.05f;
+    // Discount factor
     public float discountRate = 0.9f;
+    // Chance to explore or act greedily
     public float epsilon = 0.1f;
-    public float bettingOdds = 1f;
-    public int shuffleDeck = 26;
-    public string stateSpaceSize = "small";
-    public List<Dictionary<string, float>> stateSpace;
-    public int currentState;
-    public int dealerStop = 16;
+    // Number of episodes to train agent on
     public int episodes = 1;
 
-    public string[] choices = { "hit", "stay", "double" };
-    public string[] policy = { "greedy", "explore" };
+    // Ratio of reward to betting
+    public float bettingOdds = 1f;
+    // Shuffle deck when deck count is less than this
+    public int shuffleDeck = 26;
+
+    // State-action space size
+    public string stateSpaceSize = "small";
+    // Actual state space
+    public List<Dictionary<string, float>> stateSpace;
+    // State space index
+    public int currentState;
+
+    // Dealer must hit if dealer score less than this
+    public int dealerStop = 16;
+    
+    // 
+
+
+
+    private string[] choices = { "hit", "stay", "double" };
+    private string[] policy = { "greedy", "explore" };
 
     private Blackjack bj;
     private StateSpace ss;
-
-    public static QLearning ql;
 
     private void Awake() {
         if (ql != null && ql != this) {
@@ -41,19 +59,20 @@ public class QLearning : MonoBehaviour {
         bj.dealerStop = dealerStop;
 
         ss = StateSpace.ss;
-
         stateSpace = ss.GenerateStateSpace(stateSpaceSize);
 
         RunQLearning();
     }
 
 
-    // Return "hit", "stay", "double"
+    // Given current state, determine to hit, stay, or double
     public string MakeChoice(int currentState) {
+        // If agent hit blackjack, stay
         if (bj.agentScore == 21) {
-            return "stay";
+            return choices[1];
         }
 
+        // Determine whether to act greedily or explore using epsilon greedy
         string chosenPolicy;
         float rand = Random.Range(0f, 1f);
         if (rand <= 1-epsilon) {
@@ -65,25 +84,30 @@ public class QLearning : MonoBehaviour {
 
         string decision;
 
-        // greedy
+        // Act greedily
         if (chosenPolicy == policy[0]) {
-            decision = "hit";
+            decision = choices[0];
 
+            // Determine action to take using the Q table
             if (bj.canAgentDouble) {
-                if (stateSpace[currentState]["hit"] < stateSpace[currentState]["stay"] && 
-                    stateSpace[currentState]["double"] < stateSpace[currentState]["stay"]) {
-                    decision = "stay";
+                // hit vs stay, double vs stay
+                if (stateSpace[currentState][choices[0]] < stateSpace[currentState][choices[1]] && 
+                    stateSpace[currentState][choices[2]] < stateSpace[currentState][choices[1]]) {
+                    decision = choices[1];
                 }
-                else if (stateSpace[currentState]["hit"] < stateSpace[currentState]["double"]) {
-                    decision = "double";
+                // hit vs double
+                else if (stateSpace[currentState][choices[0]] < stateSpace[currentState][choices[2]]) {
+                    decision = choices[2];
                 }
             }
             else {
-                if (stateSpace[currentState]["hit"] < stateSpace[currentState]["stay"]) {
-                    decision = "stay";
+                // hit vs stay
+                if (stateSpace[currentState][choices[0]] < stateSpace[currentState][choices[1]]) {
+                    decision = choices[1];
                 }
             }
         }
+        // Randomly choose action to take
         else {
             if (bj.canAgentDouble) {
                 int rand2 = Random.Range(0, 3);
@@ -99,12 +123,11 @@ public class QLearning : MonoBehaviour {
     }
 
     public void RunEpisode() {
+
         bool reset = bj.GetCurrentDeckSize() < shuffleDeck;
         bj.Reset(reset);
 
         bj.DealHands();
-
-        //StartCoroutine(RunSingleTurn());
 
         for (int i = 0; i < 21; i++) {
             if (bj.ongoing) {
@@ -125,6 +148,7 @@ public class QLearning : MonoBehaviour {
                 float QNextMax = Mathf.Max(stateSpace[nextState]["hit"], stateSpace[nextState]["stay"]);
 
                 float QNew = Q + learningRate * (reward + discountRate * QNextMax - Q);
+
                 stateSpace[currentState][action] = QNew;
             }
             else {
@@ -135,52 +159,8 @@ public class QLearning : MonoBehaviour {
 
     public void RunQLearning() {
 
-        StartCoroutine(RunEpisodes());
-
-        
-    }
-
-    private IEnumerator RunSingleTurn() {
-        while (bj.ongoing) {
-            currentState = ss.IdentifySpace(stateSpaceSize, bj.agentScore, bj.low, bj.high, bj.usableAce, bj.dealerHand);
-
-            string action = MakeChoice(currentState);
-
-            float reward = bj.DealCards(action);
-
-            if (action == "double") {
-                bj.canAgentDouble = false;
-            }
-
-            float Q = stateSpace[currentState][action];
-
-            int nextState = ss.IdentifySpace(stateSpaceSize, bj.agentScore, bj.low, bj.high, bj.usableAce, bj.dealerHand);
-
-            float QNextMax = Mathf.Max(stateSpace[nextState]["hit"], stateSpace[nextState]["stay"]);
-
-            float QNew = Q + learningRate * (reward + discountRate * QNextMax - Q);
-            stateSpace[currentState][action] = QNew;
-
-            yield return null;
-        }
-    }
-
-    private IEnumerator RunEpisodes() {
-
-        int iteration = 0;
-
-        while (iteration < episodes) {
+        for (int i = 0; i < episodes; i++) {
             RunEpisode();
-
-            iteration++;
-
-            //epsilon -= (1 / episodes * 10);
-
-            if (iteration % 100 == 0) {
-                //print(iteration);
-            }
-
-            yield return null;
         }
     }
 }

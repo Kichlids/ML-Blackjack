@@ -19,10 +19,11 @@ public class Dealer : MonoBehaviour
         else {
             dealer = this;
         }
+
+        ConstructDeck();
     }
 
     private void Start() {
-        ConstructDeck();
 
         error = 0;
     }

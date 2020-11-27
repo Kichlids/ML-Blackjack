@@ -5,10 +5,7 @@ using UnityEngine;
 public class Blackjack : MonoBehaviour
 {
     public static Blackjack bj;
-
-    public int dealerStop;
-    public int usableAce;
-    public float odds;
+    
     public int agentScore;
     public int dealerScore;
     public List<Card> agentHand;
@@ -17,6 +14,10 @@ public class Blackjack : MonoBehaviour
 
     public int low = 20;
     public int high = 20;
+    public int usableAce;
+
+    public int dealerStop;
+    public float odds;
     public float bet;
     public float agentCurrentBet;
     public bool agentWin;
@@ -34,13 +35,12 @@ public class Blackjack : MonoBehaviour
         else {
             bj = this;
         }
-    }
 
-    private void Start() {
         dealer = Dealer.dealer;
         ql = QLearning.ql;
     }
 
+    // Deal hands to agent and dealer
     public void DealHands() {
 
         Card cardDrawn;
@@ -86,8 +86,6 @@ public class Blackjack : MonoBehaviour
 
     // Return the reward resulting from the decision made
     public float DealCards(string decision) {
-
-        //print("Decision: " + decision);
            
         // Draw a card
         if (decision == "hit") {
@@ -132,8 +130,6 @@ public class Blackjack : MonoBehaviour
                 high--;
             }
 
-            //StartCoroutine(DealerHit());
-
             for (int i = 0; i < 21; i++) {
                 
                 if (dealerScore < dealerStop && dealerScore < agentScore) {
@@ -153,10 +149,6 @@ public class Blackjack : MonoBehaviour
                     break;
                 }
             }
-
-            // might need to put these under dealerhit coroutine
-
-            //print(dealerScore);
 
             // Dealer busts
             if (dealerScore > 21) {
@@ -240,33 +232,5 @@ public class Blackjack : MonoBehaviour
 
     public int GetCurrentDeckSize() {
         return dealer.deck.Count;
-    }
-
-    public bool CanDouble() {
-        return canAgentDouble;
-    }
-
-    public int GetLow() {
-        return low;
-    }
-
-    public int GetHigh() {
-        return high;
-    }
-
-    public float GetCurrentBet() {
-        return agentCurrentBet;
-    }
-
-    public bool IsOngoingGame() {
-        return ongoing;
-    }
-
-    public int GetAgentScore() {
-        return agentScore;
-    }
-
-    public int GetDealerSCore() {
-        return dealerScore;
     }
 }
