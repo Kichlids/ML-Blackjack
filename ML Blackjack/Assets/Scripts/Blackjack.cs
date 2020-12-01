@@ -16,9 +16,13 @@ public class Blackjack : MonoBehaviour
     public int high = 20;
     public int usableAce;
 
+    private int lowLowerEnd;
+    private int lowHigherEnd;
+    private int highLowerEnd;
+
     public int dealerStop;
-    public float odds;
-    public float bet;
+    public float bettingOdds;
+    public float startingBet;
     public float agentCurrentBet;
     public bool agentWin;
     public bool ongoing;
@@ -40,6 +44,12 @@ public class Blackjack : MonoBehaviour
         ql = QLearning.ql;
     }
 
+    private void Start() {
+        lowLowerEnd = ql.lowLowerEnd;
+        lowHigherEnd = ql.lowHigherEnd;
+        highLowerEnd = ql.highLowerEnd;
+    }
+
     // Deal hands to agent and dealer
     public void DealHands() {
 
@@ -51,10 +61,10 @@ public class Blackjack : MonoBehaviour
             // Deal hand to the agent
             cardDrawn = dealer.DrawCard();
 
-            if (cardDrawn.cardValue >= 2 && cardDrawn.cardValue <= 6) {
+            if (cardDrawn.cardValue >= lowLowerEnd && cardDrawn.cardValue <= lowHigherEnd) {
                 low--;
             }
-            else if (cardDrawn.cardValue >= 10) {
+            else if (cardDrawn.cardValue >= highLowerEnd) {
                 high--;
                 if (cardDrawn.isAce) {
                     usableAce = 1;
@@ -66,10 +76,10 @@ public class Blackjack : MonoBehaviour
 
         // Deal a card to dealer
         cardDrawn = dealer.DrawCard();
-        if (cardDrawn.cardValue >= 2 && cardDrawn.cardValue <= 6){
+        if (cardDrawn.cardValue >= lowLowerEnd && cardDrawn.cardValue <= lowHigherEnd){
             low--;
         }
-        else if (cardDrawn.cardValue >= 10) {
+        else if (cardDrawn.cardValue >= highLowerEnd) {
             high--;
         }
         dealerHand.Add(cardDrawn);
@@ -92,10 +102,10 @@ public class Blackjack : MonoBehaviour
             canAgentDouble = false;
             Card drawnCard = dealer.DrawCard();
 
-            if (drawnCard.cardValue >= 2 && drawnCard.cardValue <= 6) {
+            if (drawnCard.cardValue >= lowLowerEnd && drawnCard.cardValue <= lowHigherEnd) {
                 low--;
             }
-            else if (drawnCard.cardValue >= 10) {
+            else if (drawnCard.cardValue >= highLowerEnd) {
                 high--;
             }
 
@@ -123,10 +133,10 @@ public class Blackjack : MonoBehaviour
         // Stay and let dealer hit
         else if (decision == "stay" || agentScore == 21) {
             Card cardDrawn = dealer.DrawCard();
-            if (cardDrawn.cardValue >= 2 && cardDrawn.cardValue <= 6) {
+            if (cardDrawn.cardValue >= lowLowerEnd && cardDrawn.cardValue <= lowHigherEnd) {
                 low--;
             }
-            else if (cardDrawn.cardValue >= 10) {
+            else if (cardDrawn.cardValue >= highLowerEnd) {
                 high--;
             }
 
@@ -136,10 +146,10 @@ public class Blackjack : MonoBehaviour
 
                     Card cardDraw = dealer.DrawCard();
 
-                    if (cardDraw.cardValue >= 2 && cardDraw.cardValue <= 6) {
+                    if (cardDraw.cardValue >= lowLowerEnd && cardDraw.cardValue <= lowHigherEnd) {
                         low--;
                     }
-                    else if (cardDrawn.cardValue >= 10) {
+                    else if (cardDrawn.cardValue >= highLowerEnd) {
                         high--;
                     }
                     dealerHand.Add(cardDrawn);
@@ -155,7 +165,7 @@ public class Blackjack : MonoBehaviour
                 ongoing = false;
                 agentWin = true;
                 ql.wins++;
-                return agentCurrentBet * odds;
+                return agentCurrentBet * bettingOdds;
             }
             // Dealer and agent tie
             else if (dealerScore == agentScore) {
@@ -165,13 +175,10 @@ public class Blackjack : MonoBehaviour
             }
             // Dealer beats agent
             else if (dealerScore > agentScore) {
-                print("here1");
-                print(agentScore);
-                print(dealerScore);
 
-                for (int i = 0; i < agentHand.Count; i++) {
-                    print(agentHand[i].cardName);
-                }
+                //for (int i = 0; i < agentHand.Count; i++) {
+                //    print(agentHand[i].cardName);
+                //}
 
                 ongoing = false;
                 agentWin = false;
@@ -179,13 +186,10 @@ public class Blackjack : MonoBehaviour
             }
             // Agent beats dealer
             else {
-                //print("here2");
-                //print(agentScore);
-                //print(dealerScore);
                 ongoing = false;
                 agentWin = true;
                 ql.wins++;
-                return agentCurrentBet * odds;
+                return agentCurrentBet * bettingOdds;
             }
         }
         // double
@@ -194,30 +198,13 @@ public class Blackjack : MonoBehaviour
             return 0;
         }
     }
-    private IEnumerator DealerHit() {
-        while (dealerScore < dealerStop && dealerScore < agentScore) {
-            Card cardDrawn = dealer.DrawCard();
-
-            if (cardDrawn.cardValue >= 2 && cardDrawn.cardValue <= 6) {
-                low--;
-            }
-            else if (cardDrawn.cardValue >= 10) {
-                high--;
-            }
-
-            dealerHand.Add(cardDrawn);
-            dealerScore = dealer.ComputeScore(dealerHand);
-        }
-
-        yield return null;
-    }
 
     public void Reset(bool hardReset) {
         agentScore = 0;
         dealerScore = 0;
         agentHand.Clear();
         dealerHand.Clear();
-        agentCurrentBet = bet;
+        agentCurrentBet = startingBet;
         agentWin = false;
         ongoing = true;
         usableAce = 0;

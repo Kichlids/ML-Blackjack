@@ -252,19 +252,12 @@ MonoBehaviour:
   learningRate: 0.05
   discountRate: 0.9
   epsilon: 0.1
+  episodes: 1000000
   bettingOdds: 1
   shuffleDeck: 26
-  stateSpaceSize: small
+  stateSpaceSize: large
   currentState: 0
   dealerStop: 16
-  episodes: 1000
-  choices:
-  - hit
-  - stay
-  - double
-  policy:
-  - greedy
-  - explore
 --- !u!114 &459779030
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -277,9 +270,6 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dae754774cc6cd441815cc45ca1b02f4, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  dealerStop: 0
-  usableAce: 0
-  odds: 0
   agentScore: 0
   dealerScore: 0
   agentHand: []
@@ -287,6 +277,9 @@ MonoBehaviour:
   deck: []
   low: 20
   high: 20
+  usableAce: 0
+  dealerStop: 0
+  odds: 0
   bet: 0
   agentCurrentBet: 0
   agentWin: 0

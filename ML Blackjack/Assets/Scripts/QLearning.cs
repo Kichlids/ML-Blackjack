@@ -18,22 +18,21 @@ public class QLearning : MonoBehaviour {
     // Number of episodes to train agent on
     public int episodes = 1;
 
-    // Ratio of reward to betting
-    public float bettingOdds = 1f;
     // Shuffle deck when deck count is less than this
     public int shuffleDeck = 26;
 
     // State-action space size
     public string stateSpaceSize = "small";
     // Actual state space
+    [SerializeField]
     public List<Dictionary<string, float>> stateSpace;
     // State space index
     public int currentState;
 
-    // Dealer must hit if dealer score less than this
-    public int dealerStop = 16;
-    
-    // 
+    //
+    public int lowLowerEnd = 2;
+    public int lowHigherEnd = 6;
+    public int highLowerEnd = 10;
 
 
 
@@ -54,14 +53,11 @@ public class QLearning : MonoBehaviour {
 
     private void Start() {
         bj = Blackjack.bj;
-        bj.bet = 1;
-        bj.odds = bettingOdds;
-        bj.dealerStop = dealerStop;
 
         ss = StateSpace.ss;
         stateSpace = ss.GenerateStateSpace(stateSpaceSize);
 
-        RunQLearning();
+        TrainQLearning();
     }
 
 
@@ -137,7 +133,7 @@ public class QLearning : MonoBehaviour {
 
                 float reward = bj.DealCards(action);
 
-                if (action == "double") {
+                if (action == choices[2]) {
                     bj.canAgentDouble = false;
                 }
 
@@ -145,7 +141,7 @@ public class QLearning : MonoBehaviour {
 
                 int nextState = ss.IdentifySpace(stateSpaceSize, bj.agentScore, bj.low, bj.high, bj.usableAce, bj.dealerHand);
 
-                float QNextMax = Mathf.Max(stateSpace[nextState]["hit"], stateSpace[nextState]["stay"]);
+                float QNextMax = Mathf.Max(stateSpace[nextState][choices[0]], stateSpace[nextState][choices[1]]);
 
                 float QNew = Q + learningRate * (reward + discountRate * QNextMax - Q);
 
@@ -157,7 +153,7 @@ public class QLearning : MonoBehaviour {
         }
     }
 
-    public void RunQLearning() {
+    public void TrainQLearning() {
 
         for (int i = 0; i < episodes; i++) {
             RunEpisode();
