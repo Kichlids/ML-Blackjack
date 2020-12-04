@@ -2,58 +2,74 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class Blackjack : MonoBehaviour
-{
-    public static Blackjack bj;
-    
-    public int agentScore;
-    public int dealerScore;
-    public List<Card> agentHand;
-    public List<Card> dealerHand;
-    public List<Card> deck;
+public enum State { DEAL_HANDS, AGENT_PLAYS, PLAYER_PLAYS, DEALER_PLAYS }
 
-    public int low = 20;
-    public int high = 20;
-    public int usableAce;
+public class Blackjack : MonoBehaviour {
 
-    private int lowLowerEnd;
-    private int lowHigherEnd;
-    private int highLowerEnd;
+    public State state;
 
-    public int dealerStop;
-    public float bettingOdds;
-    public float startingBet;
-    public float agentCurrentBet;
-    public bool agentWin;
-    public bool ongoing;
-    public bool canAgentDouble = true;
+    private int maxIndex;
 
-
-    private Dealer dealer;
     private QLearning ql;
+    private BlackjackLib bjLib;
+    private StateSpace ss;
+    private Dealer dealer;
+    private VisualManager visual;
 
-    private void Awake() {
-        if (bj != null && bj != this) {
-            Destroy(this.gameObject);
-        }
-        else {
-            bj = this;
-        }
-
-        dealer = Dealer.dealer;
-        ql = QLearning.ql;
-    }
+    // Goes in this order:
+    // Deal hands -> agent plays -> player plays -> dealer plays -> Deal hands
 
     private void Start() {
-        lowLowerEnd = ql.lowLowerEnd;
-        lowHigherEnd = ql.lowHigherEnd;
-        highLowerEnd = ql.highLowerEnd;
+        bjLib = BlackjackLib.bjLib;
+        ql = QLearning.ql;
+        ss = StateSpace.ss;
+        dealer = Dealer.dealer;
+        visual = VisualManager.visual;
     }
 
-    // Deal hands to agent and dealer
-    public void DealHands() {
+    public void PlayRound() {
+
+        print("Start a new round");
+
+        visual.ClearCardsOnPlay();
+
+        bjLib.isRealGame = true;
+        bjLib.Reset(true);
+
+        state = State.DEAL_HANDS;
+
+        StartCoroutine(DealHands());
+    }
+
+    private IEnumerator DealHands() {
+
+        print("Dealing hands");
+
+        // Shuffle cards when needed
+        bool needsReset = bjLib.GetCurrentDeckSize() < ql.shuffleDeck;
+        bjLib.Reset(needsReset);
+
+        // Deal hands to player, agent, and dealer
 
         Card cardDrawn;
+
+        // Deal two cards to player
+        for (int i = 0; i < 2; i++) {
+
+            // Deal hand to the agent
+            cardDrawn = dealer.DrawCard();
+
+            if (cardDrawn.cardValue >= ql.lowLowerEnd && cardDrawn.cardValue <= ql.lowHigherEnd) {
+                bjLib.low--;
+            }
+            else if (cardDrawn.cardValue >= ql.highLowerEnd) {
+                bjLib.high--;
+            }
+            bjLib.playerHand.Add(cardDrawn);
+
+            visual.PlayerPlayCard(cardDrawn);
+        }
+        bjLib.playerScore = dealer.ComputeScore(bjLib.playerHand);
 
         // Deal two cards to agent
         for (int i = 0; i < 2; i++) {
@@ -61,163 +77,276 @@ public class Blackjack : MonoBehaviour
             // Deal hand to the agent
             cardDrawn = dealer.DrawCard();
 
-            if (cardDrawn.cardValue >= lowLowerEnd && cardDrawn.cardValue <= lowHigherEnd) {
-                low--;
+            if (cardDrawn.cardValue >= ql.lowLowerEnd && cardDrawn.cardValue <= ql.lowHigherEnd) {
+                bjLib.low--;
             }
-            else if (cardDrawn.cardValue >= highLowerEnd) {
-                high--;
+            else if (cardDrawn.cardValue >= ql.highLowerEnd) {
+                bjLib.high--;
                 if (cardDrawn.isAce) {
-                    usableAce = 1;
+                    bjLib.usableAce = 1;
                 }
             }
-            agentHand.Add(cardDrawn);
+            bjLib.agentHand.Add(cardDrawn);
+
+            visual.AgentPlayCard(cardDrawn);
         }
-        agentScore = dealer.ComputeScore(agentHand);
+        bjLib.agentScore = dealer.ComputeScore(bjLib.agentHand);
 
         // Deal a card to dealer
         cardDrawn = dealer.DrawCard();
-        if (cardDrawn.cardValue >= lowLowerEnd && cardDrawn.cardValue <= lowHigherEnd){
-            low--;
+        if (cardDrawn.cardValue >= ql.lowLowerEnd && cardDrawn.cardValue <= ql.lowHigherEnd) {
+            bjLib.low--;
         }
-        else if (cardDrawn.cardValue >= highLowerEnd) {
-            high--;
+        else if (cardDrawn.cardValue >= ql.highLowerEnd) {
+            bjLib.high--;
         }
-        dealerHand.Add(cardDrawn);
+        bjLib.dealerHand.Add(cardDrawn);
 
-        dealerScore = dealer.ComputeScore(dealerHand);
+        visual.DealerPlayCard(cardDrawn);
+
+        bjLib.dealerScore = dealer.ComputeScore(bjLib.dealerHand);
+
+
+        print("Agent score: " + bjLib.agentScore);
+        print("Player score: " + bjLib.playerScore);
+        print("Dealer score: " + bjLib.dealerScore);
+
+        yield return new WaitForSeconds(1f);
+
+        yield return StartCoroutine(AgentPlays(ql.stateSpaceSize));
+    }
+    
+    private IEnumerator AgentPlays(string stateSize) {
+        print("Agent's turn to play");
+
+        state = State.AGENT_PLAYS;
+
+        bool endTurn = false;
+        while (!endTurn) {
+
+            // Get the current state
+            int currentState = ss.IdentifySpace(stateSize, bjLib.agentScore, bjLib.low, bjLib.high, bjLib.usableAce, bjLib.dealerHand);
+
+            List<float> choiceValues = new List<float>();
+            choiceValues.Add(ql.stateSpace[currentState][ql.choices[0]]);
+            choiceValues.Add(ql.stateSpace[currentState][ql.choices[1]]);
+
+            if (bjLib.canAgentDouble) {
+                choiceValues.Add(ql.stateSpace[currentState][ql.choices[2]]);
+            }
+
+            print(ql.stateSpace[currentState][ql.choices[0]]);
+            print(ql.stateSpace[currentState][ql.choices[1]]);
+            print(ql.stateSpace[currentState][ql.choices[2]]);
+
+            // Find the best choice
+            float maxVal = -Mathf.Infinity;//choiceValues[0];
+            maxIndex = 0;
+            for (int i = 0; i < choiceValues.Count; i++) {
+                if (choiceValues[i] > maxVal) {
+                    maxVal = choiceValues[i];
+                    maxIndex = i;
+                }
+            }
+            print("Agent choice: " + maxIndex);
+
+            // stay
+            if (maxIndex == 1 || bjLib.agentScore == 21) {
+                print("Agent stays");
+                endTurn = true;
+            }
+            // hit
+            else if (maxIndex == 0) {
+                print("Agent hits");
+
+                bjLib.canAgentDouble = false;
+                Card drawnCard = dealer.DrawCard();
+
+                print("Drew: " + drawnCard.cardName);
+
+                if (drawnCard.cardValue >= ql.lowLowerEnd && drawnCard.cardValue <= ql.lowHigherEnd) {
+                    bjLib.low--;
+                }
+                else if (drawnCard.cardValue >= ql.highLowerEnd) {
+                    bjLib.high--;
+                }
+
+                bjLib.agentHand.Add(drawnCard);
+
+                visual.AgentPlayCard(drawnCard);
+
+
+                int oldScore = bjLib.agentScore;
+                bjLib.agentScore = dealer.ComputeScore(bjLib.agentHand);
+
+                print("Agent score: " + bjLib.agentScore);
+
+                if (drawnCard.isAce && oldScore <= 10) {
+                    bjLib.usableAce = 1;
+                }
+                if (oldScore > bjLib.agentScore) {
+                    bjLib.usableAce = 0;
+                }
+
+                if (bjLib.agentScore > 21) {
+                    bjLib.agentNotBust = false;
+
+                    endTurn = true;
+                }
+            }
+            // double
+            else {
+                print("Agent doubles");
+                bjLib.agentCurrentBet *= 2;
+                bjLib.canAgentDouble = false;
+            }
+
+            yield return new WaitForSeconds(0.5f);
+        }
+
+        state = State.PLAYER_PLAYS;
     }
 
-    public void DoubleBet() {
+    public void OnPlayerHitButton() {
 
-        if (canAgentDouble) {
-            agentCurrentBet *= 2;
-        }
-    }
+        if (state == State.PLAYER_PLAYS) {
 
-    // Return the reward resulting from the decision made
-    public float DealCards(string decision) {
-           
-        // Draw a card
-        if (decision == "hit") {
-            canAgentDouble = false;
+            print("Player hits");
+
+            bjLib.canPlayerDouble = false;
+
             Card drawnCard = dealer.DrawCard();
 
-            if (drawnCard.cardValue >= lowLowerEnd && drawnCard.cardValue <= lowHigherEnd) {
-                low--;
+            print("Drew: " + drawnCard.cardName);
+
+            if (drawnCard.cardValue >= ql.lowLowerEnd && drawnCard.cardValue <= ql.lowHigherEnd) {
+                bjLib.low--;
             }
-            else if (drawnCard.cardValue >= highLowerEnd) {
-                high--;
+            else if (drawnCard.cardValue >= ql.highLowerEnd) {
+                bjLib.high--;
             }
 
-            agentHand.Add(drawnCard);
+            bjLib.playerHand.Add(drawnCard);
 
-            int oldScore = agentScore;
-            agentScore = dealer.ComputeScore(agentHand);
+            visual.PlayerPlayCard(drawnCard);
 
-            if (drawnCard.isAce && oldScore <= 10) {
-                usableAce = 1;
-            }
-            if (oldScore > agentScore) {
-                usableAce = 0;
-            }
+            bjLib.playerScore = dealer.ComputeScore(bjLib.playerHand);
 
-            if (agentScore > 21) {
-                ongoing = false;
-                agentWin = false;
-                return -agentCurrentBet;
-            }
-            else {
-                return agentCurrentBet * 0.1f;
+            print("Player score: " + bjLib.playerScore);
+
+            if (bjLib.playerScore > 21) {
+                bjLib.playerNotBust = false;
+
+                state = State.DEALER_PLAYS;
+
+                StartCoroutine(DealerPlays());
             }
         }
-        // Stay and let dealer hit
-        else if (decision == "stay" || agentScore == 21) {
-            Card cardDrawn = dealer.DrawCard();
-            if (cardDrawn.cardValue >= lowLowerEnd && cardDrawn.cardValue <= lowHigherEnd) {
-                low--;
-            }
-            else if (cardDrawn.cardValue >= highLowerEnd) {
-                high--;
-            }
+    }
 
-            for (int i = 0; i < 21; i++) {
-                
-                if (dealerScore < dealerStop && dealerScore < agentScore) {
+    public void OnPlayerStayButton() {
+        if (state == State.PLAYER_PLAYS) {
+            print("Player stays");
+            state = State.DEALER_PLAYS;
 
-                    Card cardDraw = dealer.DrawCard();
-
-                    if (cardDraw.cardValue >= lowLowerEnd && cardDraw.cardValue <= lowHigherEnd) {
-                        low--;
-                    }
-                    else if (cardDrawn.cardValue >= highLowerEnd) {
-                        high--;
-                    }
-                    dealerHand.Add(cardDrawn);
-                    dealerScore = dealer.ComputeScore(dealerHand);
-                }
-                else {
-                    break;
-                }
-            }
-
-            // Dealer busts
-            if (dealerScore > 21) {
-                ongoing = false;
-                agentWin = true;
-                ql.wins++;
-                return agentCurrentBet * bettingOdds;
-            }
-            // Dealer and agent tie
-            else if (dealerScore == agentScore) {
-                ongoing = false;
-                agentWin = false;
-                return 0;
-            }
-            // Dealer beats agent
-            else if (dealerScore > agentScore) {
-
-                //for (int i = 0; i < agentHand.Count; i++) {
-                //    print(agentHand[i].cardName);
-                //}
-
-                ongoing = false;
-                agentWin = false;
-                return -agentCurrentBet;
-            }
-            // Agent beats dealer
-            else {
-                ongoing = false;
-                agentWin = true;
-                ql.wins++;
-                return agentCurrentBet * bettingOdds;
-            }
+            StartCoroutine(DealerPlays());
         }
-        // double
+    }
+
+    public void OnPlayerDoubleButton() {
+        if (state == State.PLAYER_PLAYS && bjLib.canPlayerDouble) {
+            print("Player doubles");
+            bjLib.playerCurrentBet *= 2;
+            bjLib.canPlayerDouble = false;
+        }
+    }
+
+    private IEnumerator DealerPlays() {
+
+        print("Dealer plays");
+
+        // Deal cards if either player or agent has not bust
+        if (bjLib.playerNotBust || bjLib.agentNotBust) {
+
+            while (bjLib.dealerScore < bjLib.dealerStop     // Deawl until dealer accumulated at least the min dealing score
+                    && (bjLib.dealerScore < bjLib.agentScore || !bjLib.agentNotBust) // Deal until higher than agent unless agent bust
+                    && (bjLib.dealerScore < bjLib.playerScore || !bjLib.playerNotBust)) { // Deal until higher than player unless player bust
+
+                Card cardDrawn = dealer.DrawCard();
+
+                print("Drew: " + cardDrawn.cardName);
+
+                if (cardDrawn.cardValue >= ql.lowLowerEnd && cardDrawn.cardValue <= ql.lowHigherEnd) {
+                    bjLib.low--;
+                }
+                else if (cardDrawn.cardValue >= ql.highLowerEnd) {
+                    bjLib.high--;
+                }
+                bjLib.dealerHand.Add(cardDrawn);
+                visual.DealerPlayCard(cardDrawn);
+                bjLib.dealerScore = dealer.ComputeScore(bjLib.dealerHand);
+
+                print("Dealer score: " + bjLib.dealerScore);
+
+                yield return new WaitForSeconds(0.5f);
+            }
+        } 
+
+        // Player bust
+        if (!bjLib.playerNotBust) {
+            bjLib.playerMoney -= bjLib.playerCurrentBet;
+
+            print("Player lost");
+        }
+        // Dealer busts
+        else if (bjLib.dealerScore > 21) {
+            bjLib.playerMoney += bjLib.playerCurrentBet * bjLib.bettingOdds;
+
+            print("Player won");
+        }
+        // Dealer beats player
+        else if (bjLib.dealerScore > bjLib.playerScore) {
+            bjLib.playerMoney -= bjLib.playerCurrentBet;
+
+            print("Player lost");
+        }
+        else if (bjLib.dealerScore == bjLib.playerScore) {
+            print("Player tied");
+        }
+        // player beats dealer
         else {
-            DoubleBet();
-            return 0;
+            bjLib.playerMoney += bjLib.playerCurrentBet * bjLib.bettingOdds;
+
+            print("Player won");
         }
-    }
 
-    public void Reset(bool hardReset) {
-        agentScore = 0;
-        dealerScore = 0;
-        agentHand.Clear();
-        dealerHand.Clear();
-        agentCurrentBet = startingBet;
-        agentWin = false;
-        ongoing = true;
-        usableAce = 0;
-        canAgentDouble = true;
 
-        if (hardReset) {
-            dealer.ConstructDeck();
-            low = 20;
-            high = 20;
+        // Agent bust
+        if (!bjLib.agentNotBust) {
+            bjLib.agentMoney -= bjLib.agentCurrentBet;
+
+            print("Agent lost");
         }
-    }
+        // Dealer busts
+        else if (bjLib.dealerScore > 21) {
+            bjLib.agentMoney += bjLib.agentCurrentBet * bjLib.bettingOdds;
 
-    public int GetCurrentDeckSize() {
-        return dealer.deck.Count;
+            print("Agent won");
+        }
+        // Dealer beats agent
+        else if (bjLib.dealerScore > bjLib.agentScore) {
+            bjLib.agentMoney -= bjLib.agentCurrentBet;
+
+            print("Agent lost");
+        }
+        else if (bjLib.dealerScore == bjLib.agentScore) {
+            print("Agent tied");
+        }
+        // player beats dealer
+        else {
+            bjLib.agentMoney += bjLib.agentCurrentBet * bjLib.bettingOdds;
+
+            print("Agent won");
+        }
     }
 }

@@ -6,10 +6,7 @@ public class Dealer : MonoBehaviour
 {
     public static Dealer dealer;
 
-    public int error;
-
     public CardData[] allCards;
-
     public List<Card> deck;
 
     private void Awake() {
@@ -21,11 +18,6 @@ public class Dealer : MonoBehaviour
         }
 
         ConstructDeck();
-    }
-
-    private void Start() {
-
-        error = 0;
     }
 
     public Card DrawCard() {
@@ -57,15 +49,6 @@ public class Dealer : MonoBehaviour
         for (int i = 0; i < aceCount; i++) {
             if (sum > 21) {
                 sum -= 10;
-            }
-        }
-
-        // debug
-        if (sum <= 0) {
-            error++;
-            print("Printing cards...");
-            for (int i = 0; i < hand.Count; i++) {
-                print(hand[i].cardName);
             }
         }
 

@@ -10,10 +10,13 @@ public class QLearning : MonoBehaviour {
 
     [Header("Q Learning params")]
     // Learning rate
+    [Range(0, 1)]
     public float learningRate = 0.05f;
     // Discount factor
+    [Range(0, 1)]
     public float discountRate = 0.9f;
     // Chance to explore or act greedily
+    [Range(0, 1)]
     public float epsilon = 0.1f;
     // Number of episodes to train agent on
     public int episodes = 1;
@@ -36,10 +39,10 @@ public class QLearning : MonoBehaviour {
 
 
 
-    private string[] choices = { "hit", "stay", "double" };
+    public string[] choices = { "hit", "stay", "double" };
     private string[] policy = { "greedy", "explore" };
 
-    private Blackjack bj;
+    private BlackjackLib bjLib;
     private StateSpace ss;
 
     private void Awake() {
@@ -49,22 +52,22 @@ public class QLearning : MonoBehaviour {
         else {
             ql = this;
         }
+        Debug.Log("start");
     }
 
     private void Start() {
-        bj = Blackjack.bj;
-
+        bjLib = BlackjackLib.bjLib;
         ss = StateSpace.ss;
         stateSpace = ss.GenerateStateSpace(stateSpaceSize);
-
-        TrainQLearning();
     }
 
+    private void Update() {
+    }
 
     // Given current state, determine to hit, stay, or double
     public string MakeChoice(int currentState) {
         // If agent hit blackjack, stay
-        if (bj.agentScore == 21) {
+        if (bjLib.agentScore == 21) {
             return choices[1];
         }
 
@@ -85,7 +88,7 @@ public class QLearning : MonoBehaviour {
             decision = choices[0];
 
             // Determine action to take using the Q table
-            if (bj.canAgentDouble) {
+            if (bjLib.canAgentDouble) {
                 // hit vs stay, double vs stay
                 if (stateSpace[currentState][choices[0]] < stateSpace[currentState][choices[1]] && 
                     stateSpace[currentState][choices[2]] < stateSpace[currentState][choices[1]]) {
@@ -105,7 +108,7 @@ public class QLearning : MonoBehaviour {
         }
         // Randomly choose action to take
         else {
-            if (bj.canAgentDouble) {
+            if (bjLib.canAgentDouble) {
                 int rand2 = Random.Range(0, 3);
                 decision = choices[rand2];
             }
@@ -120,26 +123,26 @@ public class QLearning : MonoBehaviour {
 
     public void RunEpisode() {
 
-        bool reset = bj.GetCurrentDeckSize() < shuffleDeck;
-        bj.Reset(reset);
+        bool reset = bjLib.GetCurrentDeckSize() < shuffleDeck;
+        bjLib.Reset(reset);
 
-        bj.DealHands();
+        bjLib.DealHands();
 
         for (int i = 0; i < 21; i++) {
-            if (bj.ongoing) {
-                currentState = ss.IdentifySpace(stateSpaceSize, bj.agentScore, bj.low, bj.high, bj.usableAce, bj.dealerHand);
+            if (bjLib.agentNotBust) {
+                currentState = ss.IdentifySpace(stateSpaceSize, bjLib.agentScore, bjLib.low, bjLib.high, bjLib.usableAce, bjLib.dealerHand);
 
                 string action = MakeChoice(currentState);
 
-                float reward = bj.DealCards(action);
+                float reward = bjLib.DealCards(action);
 
                 if (action == choices[2]) {
-                    bj.canAgentDouble = false;
+                    bjLib.canAgentDouble = false;
                 }
 
                 float Q = stateSpace[currentState][action];
 
-                int nextState = ss.IdentifySpace(stateSpaceSize, bj.agentScore, bj.low, bj.high, bj.usableAce, bj.dealerHand);
+                int nextState = ss.IdentifySpace(stateSpaceSize, bjLib.agentScore, bjLib.low, bjLib.high, bjLib.usableAce, bjLib.dealerHand);
 
                 float QNextMax = Mathf.Max(stateSpace[nextState][choices[0]], stateSpace[nextState][choices[1]]);
 
@@ -154,10 +157,15 @@ public class QLearning : MonoBehaviour {
     }
 
     public void TrainQLearning() {
-
         for (int i = 0; i < episodes; i++) {
+             //Debug.Log((float)(i)/episodes);
             RunEpisode();
         }
+
+        // Reset to prepare for a game with player
+        bjLib.Reset(true);
+
+        print("Done training");
     }
 }
 
