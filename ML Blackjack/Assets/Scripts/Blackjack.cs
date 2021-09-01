@@ -6,6 +6,8 @@ public enum State { DEAL_HANDS, AGENT_PLAYS, PLAYER_PLAYS, DEALER_PLAYS }
 
 public class Blackjack : MonoBehaviour {
 
+    public static Blackjack bj;
+
     public State state;
 
     private int maxIndex;
@@ -16,8 +18,22 @@ public class Blackjack : MonoBehaviour {
     private Dealer dealer;
     private VisualManager visual;
 
+
+    public string playerEndGameState;
+    public string agentEndGameState;
+    public bool gameOver;
+
     // Goes in this order:
     // Deal hands -> agent plays -> player plays -> dealer plays -> Deal hands
+
+    private void Awake() {
+        if (bj != null && bj != this) {
+            Destroy(this.gameObject);
+        }
+        else {
+            bj = this;
+        }
+    }
 
     private void Start() {
         bjLib = BlackjackLib.bjLib;
@@ -28,6 +44,8 @@ public class Blackjack : MonoBehaviour {
     }
 
     public void PlayRound() {
+
+        gameOver = false;
 
         print("Start a new round");
 
@@ -297,27 +315,32 @@ public class Blackjack : MonoBehaviour {
             bjLib.playerMoney -= bjLib.playerCurrentBet;
 
             print("Player lost");
+            playerEndGameState = "Player lost";
         }
         // Dealer busts
         else if (bjLib.dealerScore > 21) {
             bjLib.playerMoney += bjLib.playerCurrentBet * bjLib.bettingOdds;
 
             print("Player won");
+            playerEndGameState = "Player won";
         }
         // Dealer beats player
         else if (bjLib.dealerScore > bjLib.playerScore) {
             bjLib.playerMoney -= bjLib.playerCurrentBet;
 
             print("Player lost");
+            playerEndGameState = "Player lost";
         }
         else if (bjLib.dealerScore == bjLib.playerScore) {
             print("Player tied");
+            playerEndGameState = "Player tied with dealer";
         }
         // player beats dealer
         else {
             bjLib.playerMoney += bjLib.playerCurrentBet * bjLib.bettingOdds;
 
             print("Player won");
+            playerEndGameState = "Player won";
         }
 
 
@@ -326,27 +349,34 @@ public class Blackjack : MonoBehaviour {
             bjLib.agentMoney -= bjLib.agentCurrentBet;
 
             print("Agent lost");
+            agentEndGameState = "Agent lost";
         }
         // Dealer busts
         else if (bjLib.dealerScore > 21) {
             bjLib.agentMoney += bjLib.agentCurrentBet * bjLib.bettingOdds;
 
             print("Agent won");
+            agentEndGameState = "Agent won";
         }
         // Dealer beats agent
         else if (bjLib.dealerScore > bjLib.agentScore) {
             bjLib.agentMoney -= bjLib.agentCurrentBet;
 
             print("Agent lost");
+            agentEndGameState = "Agent lost";
         }
         else if (bjLib.dealerScore == bjLib.agentScore) {
             print("Agent tied");
+            agentEndGameState = "Agent tied with dealer";
         }
         // player beats dealer
         else {
             bjLib.agentMoney += bjLib.agentCurrentBet * bjLib.bettingOdds;
 
             print("Agent won");
+            agentEndGameState = "Agent won";
         }
+
+        gameOver = true;
     }
 }

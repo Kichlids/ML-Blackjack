@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using TMPro;
 
 public class VisualManager : MonoBehaviour
 {
@@ -9,6 +10,19 @@ public class VisualManager : MonoBehaviour
     public GameObject cardReversePrefab;
 
     public Transform deckSpawn;
+
+    [Header("UI Elements")]
+    public GameObject hitBtn;
+    public GameObject stayBtn;
+    public GameObject doubleBtn;
+    public TextMeshProUGUI dealerScore;
+    public TextMeshProUGUI playerScore;
+    public TextMeshProUGUI agentScore;
+    public TextMeshProUGUI playerGameState;
+    public TextMeshProUGUI agentGameState;
+    public TextMeshProUGUI playerBank;
+    public TextMeshProUGUI agentBank;
+
 
     [Header("Card Layout Center")]
     public Transform playerCardsLayoutCenter;
@@ -32,6 +46,8 @@ public class VisualManager : MonoBehaviour
     // Space between center of cards in layout
     public float gapBetweenCardsLayout;
 
+    private BlackjackLib bjLib;
+    private Blackjack bj;
 
     private void Awake() {
         if (visual != null && visual != this) {
@@ -42,8 +58,34 @@ public class VisualManager : MonoBehaviour
         }
     }
 
+    private void Update() {
+
+        hitBtn.SetActive(bj.state == State.PLAYER_PLAYS);
+        stayBtn.SetActive(bj.state == State.PLAYER_PLAYS);
+        doubleBtn.SetActive(bj.state == State.PLAYER_PLAYS && bjLib.canPlayerDouble);
+
+        dealerScore.text = "Dealer score: " + bjLib.dealerScore;
+        playerScore.text = "Player score: " + bjLib.playerScore;
+        agentScore.text = "Agent score: " + bjLib.agentScore;
+
+        playerBank.text = "Player bank: " + bjLib.playerMoney;
+        agentBank.text = "Agent bank: " + bjLib.agentMoney;
+
+        if (bj.gameOver) {
+            playerGameState.text = bj.playerEndGameState;
+            agentGameState.text = bj.agentEndGameState;
+        }
+        else {
+            playerGameState.text = "";
+            agentGameState.text = "";
+        }
+    }
+
 
     private void Start() {
+        bjLib = BlackjackLib.bjLib;
+        bj = Blackjack.bj;
+
         reverseCardsInDeck = new List<GameObject>();
         playerCards = new List<GameObject>();
         agentCards = new List<GameObject>();
@@ -166,5 +208,9 @@ public class VisualManager : MonoBehaviour
         playerCards.Clear();
         agentCards.Clear();
         dealerCards.Clear();
+    }
+
+    public void OnQuitBtn() {
+        Application.Quit();
     }
 }
